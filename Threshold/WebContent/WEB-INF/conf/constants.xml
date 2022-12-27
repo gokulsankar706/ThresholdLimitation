@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<class>
+
+<leakybucket>
+		<request-limit>10</request-limit>
+		<time-lap>10</time-lap>
+</leakybucket>
+    
+</class>
