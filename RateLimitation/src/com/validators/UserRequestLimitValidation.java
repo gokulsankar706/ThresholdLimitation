@@ -2,44 +2,87 @@
 package com.validators;
 
 import com.connectors.RedisConnector;
-
 import redis.clients.jedis.Jedis;
 
 public class UserRequestLimitValidation {
 
-	public static void reqLimitValidation(String Ip) {
-		RedisConnector connector = new RedisConnector();
-		if(!Ip.isEmpty()) {
-			Jedis jedis = connector.getRedisConnector();
-			if(!jedis.exists(Ip)) {
-				deleteAndUpdateUserCache(jedis, Ip, 4, false);
-				//Should handle allow
+	public static boolean reqLimitValidation(String ip, String uri) {
+		if(!ip.isEmpty()) {
+			Jedis jedis = RedisConnector.getRedisConnector();
+			String cacheKey = getCacheKey(ip, uri);
+			if(!jedis.exists(cacheKey)) {
+				deleteAndUpdateUserCache(jedis, cacheKey, (2-1), (5-1), false);
+				return true;
 			}
-			else if(jedis.exists(Ip)) {
-				String userInfo = jedis.get(Ip);
-				String userData[] = userInfo.split(userInfo,2);
-				int count = Integer.parseInt(userData[0]);
-				Long lastVistTime = (System.currentTimeMillis() - Long.parseLong(userData[1]));
-				if(lastVistTime < 1000 && count > 0) {
-					deleteAndUpdateUserCache(jedis, Ip, count-1, true);
-					//Should handle allow
-				}
-				else if(lastVistTime > 1000) {
-					deleteAndUpdateUserCache(jedis, Ip, 4, true);
-				}
-				else {
-					//should handle
+			else if(jedis.exists(cacheKey)) {
+				String userInfo = getCacheData(cacheKey, jedis);
+				if(!userInfo.isEmpty()) {
+					String userData[] = userInfo.split(",",3);
+					int remainingSecCount = Integer.parseInt(userData[1]);
+					int remainingMinCount = Integer.parseInt(userData[2]);
+					Long lastReqTime = (System.currentTimeMillis() - Long.parseLong(userData[0]));
+					//within second
+					if(lastReqTime < 1000 && remainingSecCount > 0 && remainingMinCount > 0) {
+						deleteAndUpdateUserCache(jedis, cacheKey, remainingSecCount-1, remainingMinCount-1,true);
+						return true;
+					}
+					else if(lastReqTime > 1000) {
+						//within a minute
+						if((lastReqTime < 1000*60) && remainingMinCount > 0) {
+							deleteAndUpdateUserCache(jedis, cacheKey, 2, remainingMinCount-1, true);
+							return true;
+						}
+						//after a minute
+						if(lastReqTime > 1000*60) {
+							deleteAndUpdateUserCache(jedis, cacheKey, (2-1), (5-1), true);
+							return true;
+						}
+					}
+					else {
+						if(remainingSecCount <= 0) {
+							System.out.println("You have crossed your throttal limit(sec)");
+						}else {
+							System.out.println("You have crossed your throttal limit(min)");
+						}
+					}
 				}
 			}
+		}
+		return false;
+	}
+
+	private static void deleteAndUpdateUserCache(Jedis jedis, String cacheKey, int perSecCount, int perMinCount, boolean isUpdate) {
+		Long currentTime = System.currentTimeMillis();
+		String value = currentTime.toString()+","+String.valueOf(perSecCount)+","+String.valueOf(perMinCount);
+		try {
+			if(isUpdate) {
+				jedis.del(cacheKey);
+			}
+			jedis.set(cacheKey, value);
+		}catch(Exception ex) {
+			System.out.println("Exception while deleting/putting data in cache");
 		}
 	}
 
-	private static void deleteAndUpdateUserCache(Jedis jedis, String Ip, int count, boolean isUpdate) {
-		Long currentTime = System.currentTimeMillis();
-		String value = currentTime.toString()+","+String.valueOf(count-1);
-		if(isUpdate) {
-			jedis.del(Ip);
+	private static String getCacheData(String cacheKey, Jedis connector) {
+		try {
+			return connector.get(cacheKey);
+		}catch(Exception ex){
+			System.out.println("Exception while getting data from cache");
 		}
-		jedis.set(Ip, value);
+		return null;
+	}
+	
+	public static String getCacheKey(String ip, String uri) {
+		String uriInfo[] = uri.substring(1).split("/");
+		String cacheKey = "";
+		for(int i=0; i<uriInfo.length; i++) {
+			if(i==0) {
+				cacheKey += uriInfo[i];
+			}else {
+				cacheKey += "."+uriInfo[i];
+			}
+		}
+		return cacheKey+"_"+ip;
 	}
 }

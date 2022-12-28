@@ -10,6 +10,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.json.JSONObject;
 
+import com.connectors.MySqlConnector;
+import com.handlers.RequestHandler;
+import com.mysql.cj.MysqlConnection;
+
 import redis.clients.jedis.Jedis;
 
 public class CacheConnection extends HttpServlet {
@@ -20,9 +24,11 @@ public class CacheConnection extends HttpServlet {
 	
 	public static void redis() {
 		try {
+			//RequestHandler.login("gokul", "gokul@123");
+			RequestHandler.signUp("gopinath", "gokul@123");
 			Jedis jet = new Jedis("localhost",6379);
 			System.out.println("Connected....");
-			System.out.println(jet.info());
+			//System.out.println(jet.info());
 			System.out.println("pushing...."+jet.lpush("apple","sweet"));
 			System.out.println("getting...."+jet.lpop("apple"));
 			
