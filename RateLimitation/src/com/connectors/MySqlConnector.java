@@ -5,9 +5,13 @@ import java.sql.*;
 
 public class MySqlConnector {
 
+	private static MySqlConnector mysqlconnector;
 	private static Connection connection = null;
 	private static Statement statement = null;
 
+	private MySqlConnector() {
+		
+	}
 	private void getDBConnection(){
 		String url = "jdbc:mysql://localhost:3306/Gokul";
 		String uname = "root";
@@ -19,6 +23,13 @@ public class MySqlConnector {
 			System.out.println("Exception while connect with myslq "+ex);
 		}
 	}
+	
+	public static MySqlConnector getInstance(){
+	    if(mysqlconnector == null){
+	    	mysqlconnector = new MySqlConnector();
+	    }
+	    return mysqlconnector;
+	    }
 
 	public Connection getConnection() throws SQLException {
 		if(connection != null && !connection.isClosed()) {
